@@ -3,12 +3,15 @@ import csv
 import json
 import re
 import string
-from time import time
-from explorer import app_settings
-from django.db import connections, connection, models, transaction, DatabaseError
+
+from django.db import connections, connection, models, DatabaseError
+
 from django.http import HttpResponse
-from six.moves import cStringIO
 import sqlparse
+
+from explorer import app_settings
+from six.moves import cStringIO
+
 
 EXPLORER_PARAM_TOKEN = "$$"
 
@@ -20,9 +23,11 @@ def passes_blacklist(sql):
     return not any(write_word in clean.upper() for write_word in app_settings.EXPLORER_SQL_BLACKLIST)
 
 
-def get_connection():
-    return connections[app_settings.EXPLORER_CONNECTION_NAME] if app_settings.EXPLORER_CONNECTION_NAME else connection
-
+def get_connection(connection_name=None):
+    if connection_name:
+        return connections[connection_name]
+    else:
+        return connections[app_settings.EXPLORER_CONNECTION_NAME] if app_settings.EXPLORER_CONNECTION_NAME else connection
 
 
 def schema_info():
@@ -47,17 +52,17 @@ def schema_info():
         for model in models.get_models(app):
             friendly_model = "%s -> %s" % (app.__package__, model._meta.object_name)
             ret.append((
-                          friendly_model,
-                          model._meta.db_table,
-                          [_format_field(f) for f in model._meta.fields]
-                      ))
+                friendly_model,
+                model._meta.db_table,
+                [_format_field(f) for f in model._meta.fields]
+            ))
 
             # Do the same thing for many_to_many fields. These don't show up in the field list of the model
             # because they are stored as separate "through" relations and have their own tables
             ret += [(
-                       friendly_model,
-                       m2m.rel.through._meta.db_table,
-                       [_format_field(f) for f in m2m.rel.through._meta.fields]
+                        friendly_model,
+                        m2m.rel.through._meta.db_table,
+                        [_format_field(f) for f in m2m.rel.through._meta.fields]
                     ) for m2m in model._meta.many_to_many]
 
     return sorted(ret, key=lambda t: t[1])

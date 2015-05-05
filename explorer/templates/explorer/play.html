@@ -17,10 +17,24 @@
             {% if error %}
                 <div class="alert alert-danger">{{ error|escape }}</div>
             {% endif %}
+            {% if EXPLORER_ADHOC_DB_CONNECTIONS %}
+            <div class="form-group">
+                <label for="connection_list">Connection </label>
+                <select name="connection_name" id="connection_list" class="form-control">
+                    {% for connection in connections %}
+                        <option value="{{ connection.alias }}"
+                        {% if connection.alias == connection_name %} selected {% endif %}>
+                            {{ connection.alias }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
             <div class="panel panel-default sql-panel">
                 <div class="panel-heading">
                     <span class="panel-title">SQL</span>
                 </div>
+
                 <div class="panel-content">
                     <textarea class="form-control" cols="40" id="id_sql" name="sql" rows="10">{{ query.sql }}</textarea>
                 </div>

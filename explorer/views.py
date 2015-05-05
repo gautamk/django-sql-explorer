@@ -11,7 +11,7 @@ from django.utils.decorators import method_decorator
 from django.core.urlresolvers import reverse_lazy
 from django.forms.models import model_to_dict
 from django.http import HttpResponse
-from django.db import DatabaseError
+from django.db import DatabaseError, connections
 
 from explorer.models import Query, QueryLog
 from explorer import app_settings
@@ -62,8 +62,18 @@ def change_permission(f):
 class ExplorerContextMixin(object):
 
     def gen_ctx(self):
-        return {'can_view': app_settings.EXPLORER_PERMISSION_VIEW(self.request.user),
-                'can_change': app_settings.EXPLORER_PERMISSION_CHANGE(self.request.user)}
+        connection_name = self.request.REQUEST.get('connection_name', app_settings.EXPLORER_CONNECTION_NAME)
+        rc = {
+            'EXPLORER_ADHOC_DB_CONNECTIONS': app_settings.EXPLORER_ADHOC_DB_CONNECTIONS,
+            'can_view': app_settings.EXPLORER_PERMISSION_VIEW(self.request.user),
+            'can_change': app_settings.EXPLORER_PERMISSION_CHANGE(self.request.user)
+        }
+        if app_settings.EXPLORER_ADHOC_DB_CONNECTIONS:
+            rc.update({
+                'connections': connections.all(),
+                'connection_name': connection_name,
+            })
+        return rc
 
     def get_context_data(self, **kwargs):
         ctx = super(ExplorerContextMixin, self).get_context_data(**kwargs)
@@ -239,7 +249,11 @@ class PlayQueryView(ExplorerContextMixin, View):
         return self.render_with_sql(request, query, show_results)
 
     def render(self, request):
-        return self.render_template('explorer/play.html', RequestContext(request, {'title': 'Playground'}))
+        return self.render_template('explorer/play.html',
+                                    RequestContext(request, {'title': 'Playground',
+                                                             "connections": connections.all(),
+                                                             "EXPLORER_ADHOC_DB_CONNECTIONS": app_settings.EXPLORER_ADHOC_DB_CONNECTIONS,
+                                                             }))
 
     def render_with_sql(self, request, query, show_results=True):
         return self.render_template('explorer/play.html', query_viewmodel(request, query, title="Playground", show_results=show_results))
@@ -262,7 +276,6 @@ class QueryView(ExplorerContextMixin, View):
             return HttpResponseRedirect(
                 reverse_lazy('query_detail', kwargs={'query_id': query_id})
             )
-
         query, form = QueryView.get_instance_and_form(request, query_id)
         success = form.is_valid() and form.save()
         query.log(request.user)
@@ -278,26 +291,40 @@ class QueryView(ExplorerContextMixin, View):
 
 
 def query_viewmodel(request, query, title=None, form=None, message=None, show_results=True):
+    """
+
+    :param request: a standard HttpRequest
+    :param query: an instance of Query
+    :return: an instance of RequestContext
+    """
     rows = url_get_rows(request)
     res = None
     error = None
+    connection_name = request.REQUEST.get("connection_name", app_settings.EXPLORER_CONNECTION_NAME)
     if show_results:
         try:
-            res = query.execute()
+            res = query.execute(connection_name)
         except DatabaseError as e:
             error = str(e)
-    return RequestContext(request, {
-            'params': query.available_params(),
-            'title': title,
-            'shared': query.shared,
-            'query': query,
-            'form': form,
-            'message': message,
-            'error': error,
-            'data': res.data[:rows] if not error and show_results else None,
-            'headers': res.headers if not error and show_results else None,
-            'total_rows': len(res.data) if not error and show_results else None,
-            'duration': res.duration if not error and show_results else None,
-            'rows': rows,
-            'has_stats': len([h for h in res.headers if h.summary]) if not error and show_results else False,
-            'dataUrl': reverse_lazy('query_csv', kwargs={'query_id': query.id}) if query.id else ''})
+    rc = RequestContext(request, {
+        'params': query.available_params(),
+        'title': title,
+        'shared': query.shared,
+        'query': query,
+        'form': form,
+        'message': message,
+        'EXPLORER_ADHOC_DB_CONNECTIONS': app_settings.EXPLORER_ADHOC_DB_CONNECTIONS,
+        'error': error,
+        'data': res.data[:rows] if not error and show_results else None,
+        'headers': res.headers if not error and show_results else None,
+        'total_rows': len(res.data) if not error and show_results else None,
+        'duration': res.duration if not error and show_results else None,
+        'rows': rows,
+        'has_stats': len([h for h in res.headers if h.summary]) if not error and show_results else False,
+        'dataUrl': reverse_lazy('query_csv', kwargs={'query_id': query.id}) if query.id else ''})
+    if app_settings.EXPLORER_ADHOC_DB_CONNECTIONS:
+        rc.update({
+            'connections': connections.all(),
+            'connection_name': connection_name,
+        })
+    return rc

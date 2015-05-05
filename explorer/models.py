@@ -43,15 +43,15 @@ class Query(models.Model):
     def final_sql(self):
         return swap_params(self.sql, self.params)
 
-    def try_execute(self):
+    def try_execute(self, connection_name=app_settings.EXPLORER_CONNECTION_NAME):
         """
         A lightweight version of .execute to just check the validity of the SQL.
         Skips the processing associated with QueryResult.
         """
-        QueryResult(self.final_sql())
+        QueryResult(self.final_sql(), connection_name)
 
-    def execute(self):
-        ret = QueryResult(self.final_sql())
+    def execute(self, connection_name=app_settings.EXPLORER_CONNECTION_NAME):
+        ret = QueryResult(self.final_sql(), connection_name)
         ret.process()
         return ret
 
@@ -108,11 +108,11 @@ class QueryLog(models.Model):
 
 class QueryResult(object):
 
-    def __init__(self, sql):
+    def __init__(self, sql, connection_name):
 
         self.sql = sql
 
-        cursor, duration = self.execute_query()
+        cursor, duration = self.execute_query(connection_name)
 
         self._description = cursor.description or []
         self._data = [list(r) for r in cursor.fetchall()]
@@ -176,8 +176,8 @@ class QueryResult(object):
             for ix, t in transforms:
                 r[ix] = t.format(str(r[ix]))
 
-    def execute_query(self):
-        conn = get_connection()
+    def execute_query(self, connection_name):
+        conn = get_connection(connection_name)
         cursor = conn.cursor()
         start_time = time()
 

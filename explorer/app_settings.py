@@ -18,6 +18,8 @@ EXPLORER_PERMISSION_CHANGE = getattr(settings, 'EXPLORER_PERMISSION_CHANGE', lam
 
 EXPLORER_RECENT_QUERY_COUNT = getattr(settings, 'EXPLORER_RECENT_QUERY_COUNT', 10)
 
+EXPLORER_ADHOC_DB_CONNECTIONS = getattr(settings, 'EXPLORER_ADHOC_DB_CONNECTIONS', False)
+
 # This is callable instead of a static attribute so that it gets reevaluated on every call.
 # This aids testability. Otherwise this property gets loaded at the beginning of the test run
 # and can't be overridden. There is surely a better pattern for this, but this'll hold for now.

@@ -40,6 +40,21 @@
                         <textarea class="form-control" cols="40" id="id_description" name="description" {% if not can_change %}disabled{% endif %} rows="2">{{ form.description.value|default_if_none:"" }}</textarea>
                     </div>
                 </div>
+                {% if EXPLORER_ADHOC_DB_CONNECTIONS %}
+                    <div class="form-group">
+                        <label class="col-sm-2 control-label" for="connection_list">Connection</label>
+                        <div class="col-sm-10">
+                            <select name="connection_name" id="connection_list" class="form-control">
+                                {% for connection in connections %}
+                                    <option value="{{ connection.alias }}"
+                                            {% if connection.alias == connection_name %} selected {% endif %}>
+                                        {{ connection.alias }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                {% endif %}
                 {% if query %}
                     <div class="form-group">
                         {{ form.created_by_user.errors }}
